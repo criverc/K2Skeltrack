@@ -65,6 +65,7 @@ AC_SUBST(PRJ_API_NAME)
 # Check for programs
 AC_PROG_LIBTOOL
 AC_PROG_CC
+AC_PROG_CXX
 AC_PROG_INSTALL
 AM_PROG_CC_C_O
 
@@ -85,17 +86,30 @@ AC_ARG_ENABLE(examples,
                 [Build examples [default=yes]]),,
                 [enable_examples=yes])
 
+AC_ARG_ENABLE(examples_freenect2,
+        AS_HELP_STRING([--enable-examples-freenect2[=@<:@no/yes@:>@]],
+                [Build examples for freenect2 [default=yes]]),,
+                [enable_examples_freenect2=yes])
+
 # Check for GFreenect as it's required for the test-kinect example
 GFREENECT_REQUIRED=0.1.4
 CLUTTER_REQUIRED=1.8.4
 CAIRO_REQUIRED=1.10.2
+
 PKG_CHECK_MODULES(EXAMPLES_DEPS, gfreenect-0.1 >= GFREENECT_REQUIRED
                                  clutter-1.0 >= CLUTTER_REQUIRED
                                  cairo >= CAIRO_REQUIRED,
                                  enable_examples=yes,
                                  enable_examples=no)
 
+PKG_CHECK_MODULES(EXAMPLES_FREENECT2_DEPS, freenect2
+                                           clutter-1.0 >= CLUTTER_REQUIRED
+                                           cairo >= CAIRO_REQUIRED,
+                                           enable_examples_freenect2=yes,
+                                           enable_examples_freenect2=no)
+
 AM_CONDITIONAL(ENABLE_EXAMPLES, test x"${enable_examples}" = x"yes")
+AM_CONDITIONAL(ENABLE_EXAMPLES_FREENECT2, test x"${enable_examples_freenect2}" = x"yes")
 
 # GObject-Introspection check
 GOBJECT_INTROSPECTION_CHECK([0.6.7])
@@ -154,4 +168,5 @@ echo "     Build API documentation:   ${enable_gtk_doc}"
 echo "           Enable debug mode:   ${enable_debug}"
 echo "      Enable automated tests:   ${enable_tests}"
 echo "              Build examples:   ${enable_examples}"
+echo "Build examples for freenect2:   ${enable_examples_freenect2}"
 echo ""
