@@ -557,7 +557,7 @@ void on_timeline_new_frame (ClutterTimeline *timeline, gint frame_num, gpointer 
 
     framecount++;
     if (framecount % 100 == 0)
-        std::cout << "The viewer is turned off. Received " << framecount << " frames. Ctrl-C to stop." << std::endl;
+        std::cout << "Received " << framecount << " frames." << std::endl;
 
     on_video_frame (rgb);
     on_depth_frame (depth);
