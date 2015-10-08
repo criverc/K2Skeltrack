@@ -368,25 +368,25 @@ on_skeleton_draw (ClutterCanvas *canvas,
 
   connect_joints (cairo, left_shoulder, right_shoulder, "#afafaf");
 
-  connect_joints (cairo, left_shoulder, left_elbow, "#afafaf");
+  connect_joints (cairo, left_shoulder, left_hand, "#afafaf");
 
-  connect_joints (cairo, right_shoulder, right_elbow, "#afafaf");
+  connect_joints (cairo, right_shoulder, right_hand, "#afafaf");
 
-  connect_joints (cairo, right_hand, right_elbow, "#afafaf");
+//  connect_joints (cairo, right_hand, right_elbow, "#afafaf");
 
-  connect_joints (cairo, left_hand, left_elbow, "#afafaf");
+//  connect_joints (cairo, left_hand, left_elbow, "#afafaf");
 
   paint_joint (cairo, left_hand, 30, "#C2FF00");
 
   paint_joint (cairo, left_shoulder, 20, "#C2FF00");
 
-  paint_joint (cairo, left_elbow, 20, "#C2FF00");
+//  paint_joint (cairo, left_elbow, 20, "#C2FF00");
 
   paint_joint (cairo, right_hand, 30, "#00FAFF");
 
   paint_joint (cairo, right_shoulder, 20, "#00FAFF");
 
-  paint_joint (cairo, right_elbow, 20, "#00FAFF");
+//  paint_joint (cairo, right_elbow, 20, "#00FAFF");
 
   skeltrack_joint_list_free (list);
   list = NULL;
