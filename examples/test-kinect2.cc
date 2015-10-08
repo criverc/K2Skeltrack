@@ -16,6 +16,7 @@
 
 static SkeltrackSkeleton *skeleton = NULL;
 static ClutterActor *info_text;
+static ClutterActor *skel_tex;
 static ClutterActor *depth_tex;
 static ClutterActor *video_tex;
 static ClutterContent *depth_canvas;
@@ -76,11 +77,8 @@ on_track_joints (GObject      *obj,
 
   if (error == NULL)
     {
-      if (SHOW_SKELETON)
-        {
-          content = clutter_actor_get_content (depth_tex);
-          clutter_content_invalidate (content);
-        }
+      content = clutter_actor_get_content (skel_tex);
+      clutter_content_invalidate (content);
     }
   else
     {
@@ -235,39 +233,25 @@ on_depth_frame (libfreenect2::Frame* frame)
 
 
   content = clutter_actor_get_content (depth_tex);
-  if (!SHOW_SKELETON)
+  grayscale_buffer = create_grayscale_buffer (buffer_info, dimension_factor);
+
+  if (depth_image == NULL)
+    depth_image = clutter_image_new ();
+
+  clutter_actor_set_content (depth_tex, depth_image);
+  if (! clutter_image_set_data (CLUTTER_IMAGE (depth_image),
+                                grayscale_buffer,
+                                COGL_PIXEL_FORMAT_RGB_888,
+                                width,
+                                height,
+                                0,
+                                &error))
     {
-      grayscale_buffer = create_grayscale_buffer (buffer_info,
-                                                  dimension_factor);
-
-      if (depth_image == NULL)
-        depth_image = clutter_image_new ();
-
-      /* ref because we don't want it to be freed */
-      if (depth_canvas == content)
-        g_object_ref (depth_canvas);
-
-      clutter_actor_set_content (depth_tex, depth_image);
-      if (! clutter_image_set_data (CLUTTER_IMAGE (depth_image),
-                                    grayscale_buffer,
-                                    COGL_PIXEL_FORMAT_RGB_888,
-                                    width, height,
-                                    0,
-                                    &error))
-        {
-          g_debug ("Error setting texture area: %s", error->message);
-          g_error_free (error);
-        }
-      g_slice_free1 (width * height * sizeof (guchar) * 3, grayscale_buffer);
+      g_debug ("Error setting texture area: %s", error->message);
+      g_error_free (error);
     }
-  else {
-    /* ref because we don't want it to be freed */
-    if (depth_image && depth_image == content)
-      g_object_ref (depth_image);
 
-    clutter_actor_set_content (depth_tex, depth_canvas);
-  }
-
+  g_slice_free1 (width * height * sizeof (guchar) * 3, grayscale_buffer);
   g_slice_free1 (width * height * sizeof (guint16), depth);
 }
 
@@ -475,6 +459,8 @@ on_key_release (ClutterActor *actor,
     {
     case CLUTTER_KEY_space:
       SHOW_SKELETON = !SHOW_SKELETON;
+      if (SHOW_SKELETON) clutter_actor_set_opacity (skel_tex, 122);
+      else               clutter_actor_set_opacity (skel_tex, 0);
       break;
     case CLUTTER_KEY_plus:
       set_threshold (100);
@@ -524,18 +510,8 @@ create_instructions (void)
 static void
 on_destroy (ClutterActor *actor, gpointer data)
 {
-  ClutterContent *content;
-  void* device;
-
-  content = clutter_actor_get_content (depth_tex);
-  if (content == depth_canvas)
-    g_object_unref (depth_image);
-  else
-    g_object_unref (depth_canvas);
-
   clutter_main_quit ();
 }
-
 
 static void
 quit (gint signale)
@@ -565,14 +541,13 @@ void on_timeline_new_frame (ClutterTimeline *timeline, gint frame_num, gpointer 
     listener.release (frames);
 }
 
-
 int
 main (int argc, char *argv[])
 {
   ClutterActor *stage, *instructions;
   GError *error = NULL;
-  gint width = 640;
-  gint height = 480;
+  gint width = 512;
+  gint height = 424;
 
   if (clutter_init (&argc, &argv) != CLUTTER_INIT_SUCCESS)
     return -1;
@@ -586,11 +561,18 @@ main (int argc, char *argv[])
   g_signal_connect (stage, "key-release-event", G_CALLBACK (on_key_release), NULL);
 
   depth_tex = clutter_actor_new ();
-  depth_canvas = clutter_canvas_new ();
-  clutter_actor_set_content (depth_tex, depth_canvas);
-  clutter_canvas_set_size (CLUTTER_CANVAS (depth_canvas), width, height);
   clutter_actor_set_size (depth_tex, width, height);
   clutter_actor_add_child (stage, depth_tex); 
+  clutter_actor_set_position (depth_tex, 0.0, 0.0);
+
+  skel_tex = clutter_actor_new ();
+  depth_canvas = clutter_canvas_new ();
+  clutter_actor_set_content (skel_tex, depth_canvas);
+  clutter_canvas_set_size (CLUTTER_CANVAS (depth_canvas), width, height);
+  clutter_actor_set_size (skel_tex, width, height);
+  clutter_actor_add_child (stage, skel_tex);
+  clutter_actor_set_position (skel_tex, 0.0, 0.0);
+  clutter_actor_set_opacity (skel_tex, 122);
 
   video_tex = clutter_actor_new ();
   clutter_actor_set_content (video_tex, clutter_image_new ());
