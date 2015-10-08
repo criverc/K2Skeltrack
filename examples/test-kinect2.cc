@@ -463,10 +463,10 @@ on_key_release (ClutterActor *actor,
       else               clutter_actor_set_opacity (skel_tex, 0);
       break;
     case CLUTTER_KEY_plus:
-      set_threshold (100);
+      set_threshold (10);
       break;
     case CLUTTER_KEY_minus:
-      set_threshold (-100);
+      set_threshold (-10);
       break;
     case CLUTTER_KEY_Up:
       set_tilt_angle (kinect, 5);
