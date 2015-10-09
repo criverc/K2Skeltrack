@@ -10,13 +10,14 @@
 static SkeltrackSkeleton *skeleton = NULL;
 static GFreenectDevice *kinect = NULL;
 static ClutterActor *info_text;
+static ClutterActor *skel_tex;
 static ClutterActor *depth_tex;
 static ClutterActor *video_tex;
 static ClutterContent *depth_canvas;
 static ClutterContent *depth_image = NULL;
 static SkeltrackJointList list = NULL;
 
-static gboolean SHOW_SKELETON = TRUE;
+static enum { SKELETON, CLOUD, BOTH } SHOW = BOTH;
 static gboolean ENABLE_SMOOTHING = TRUE;
 static gfloat SMOOTHING_FACTOR = .0;
 
@@ -59,11 +60,8 @@ on_track_joints (GObject      *obj,
 
   if (error == NULL)
     {
-      if (SHOW_SKELETON)
-        {
-          content = clutter_actor_get_content (depth_tex);
-          clutter_content_invalidate (content);
-        }
+      content = clutter_actor_get_content (skel_tex);
+      clutter_content_invalidate (content);
     }
   else
     {
@@ -207,38 +205,26 @@ on_depth_frame (GFreenectDevice *kinect, gpointer user_data)
 
 
   content = clutter_actor_get_content (depth_tex);
-  if (!SHOW_SKELETON)
-    {
-      grayscale_buffer = create_grayscale_buffer (buffer_info,
-                                                  dimension_factor);
 
-      if (depth_image == NULL)
-        depth_image = clutter_image_new ();
+  grayscale_buffer = create_grayscale_buffer (buffer_info,
+                                              dimension_factor);
 
-      /* ref because we don't want it to be freed */
-      if (depth_canvas == content)
-        g_object_ref (depth_canvas);
+  if (depth_image == NULL)
+    depth_image = clutter_image_new ();
 
-      clutter_actor_set_content (depth_tex, depth_image);
-      if (! clutter_image_set_data (CLUTTER_IMAGE (depth_image),
-                                    grayscale_buffer,
-                                    COGL_PIXEL_FORMAT_RGB_888,
-                                    width, height,
-                                    0,
-                                    &error))
-        {
-          g_debug ("Error setting texture area: %s", error->message);
-          g_error_free (error);
-        }
-      g_slice_free1 (width * height * sizeof (guchar) * 3, grayscale_buffer);
-    }
-  else {
-    /* ref because we don't want it to be freed */
-    if (depth_image && depth_image == content)
-      g_object_ref (depth_image);
-
-    clutter_actor_set_content (depth_tex, depth_canvas);
+  clutter_actor_set_content (depth_tex, depth_image);
+  if (! clutter_image_set_data (CLUTTER_IMAGE (depth_image),
+                                grayscale_buffer,
+                                COGL_PIXEL_FORMAT_RGB_888,
+                                width, height,
+                                0,
+                                &error))
+  {
+    g_debug ("Error setting texture area: %s", error->message);
+    g_error_free (error);
   }
+
+  g_slice_free1 (width * height * sizeof (guchar) * 3, grayscale_buffer);
 }
 
 static void
@@ -378,11 +364,11 @@ static void
 set_info_text (void)
 {
   gchar *title;
-  title = g_strdup_printf ("<b>Current View:</b> %s\t\t\t"
+  title = g_strdup_printf ("<b>Current View:</b> %s\t"
                            "<b>Threshold:</b> %d\n"
                            "<b>Smoothing Enabled:</b> %s\t\t\t"
                            "<b>Smoothing Level:</b> %.2f",
-                           SHOW_SKELETON ? "Skeleton" : "Point Cloud",
+                           SHOW == SKELETON ? "Skeleton\t\t" : SHOW == CLOUD ? "Point Cloud\t\t" : "Skeleton and Point Cloud",
                            THRESHOLD_END,
                            ENABLE_SMOOTHING ? "Yes" : "No",
                            SMOOTHING_FACTOR);
@@ -453,7 +439,10 @@ on_key_release (ClutterActor *actor,
   switch (key)
     {
     case CLUTTER_KEY_space:
-      SHOW_SKELETON = !SHOW_SKELETON;
+      SHOW= (SHOW + 1) % 3;
+      if (SHOW == SKELETON)   clutter_actor_set_opacity (skel_tex, 255);
+      else if (SHOW == CLOUD) clutter_actor_set_opacity (skel_tex, 0);
+      else                    clutter_actor_set_opacity (skel_tex, 122);
       break;
     case CLUTTER_KEY_plus:
       set_threshold (100);
@@ -491,7 +480,7 @@ create_instructions (void)
   clutter_text_set_markup (CLUTTER_TEXT (text),
                          "<b>Instructions:</b>\n"
                          "\tChange between skeleton\n"
-                         "\t  tracking and threshold view:  \tSpace bar\n"
+                         "\t  tracking, threshold view or both:  \tSpace bar\n"
                          "\tSet tilt angle:  \t\t\t\tUp/Down Arrows\n"
                          "\tIncrease threshold:  \t\t\t+/-\n"
                          "\tEnable/Disable smoothing:  \t\ts\n"
@@ -506,11 +495,7 @@ on_destroy (ClutterActor *actor, gpointer data)
   ClutterContent *content;
   GFreenectDevice *device = GFREENECT_DEVICE (data);
 
-  content = clutter_actor_get_content (depth_tex);
-  if (content == depth_canvas)
-    g_object_unref (depth_image);
-  else
-    g_object_unref (depth_canvas);
+  GFreenectDevice *device = GFREENECT_DEVICE (data);
 
   gfreenect_device_stop_depth_stream (device, NULL);
   gfreenect_device_stop_video_stream (device, NULL);
@@ -550,11 +535,18 @@ on_new_kinect_device (GObject      *obj,
                     kinect);
 
   depth_tex = clutter_actor_new ();
-  depth_canvas = clutter_canvas_new ();
-  clutter_actor_set_content (depth_tex, depth_canvas);
-  clutter_canvas_set_size (CLUTTER_CANVAS (depth_canvas), width, height);
   clutter_actor_set_size (depth_tex, width, height);
   clutter_actor_add_child (stage, depth_tex);
+  clutter_actor_set_position (depth_tex, 0.0, 0.0);
+
+  skel_tex = clutter_actor_new ();
+  depth_canvas = clutter_canvas_new ();
+  clutter_actor_set_content (skel_tex, depth_canvas);
+  clutter_canvas_set_size (CLUTTER_CANVAS (depth_canvas), width, height);
+  clutter_actor_set_size (skel_tex, width, height);
+  clutter_actor_add_child (stage, skel_tex);
+  clutter_actor_set_position (skel_tex, 0.0, 0.0);
+  clutter_actor_set_opacity (skel_tex, 122);
 
   video_tex = clutter_actor_new ();
   clutter_actor_set_content (video_tex, clutter_image_new ());
