@@ -55,7 +55,9 @@
  * #SkeltrackSkeleton:shoulders-arc-start-point ,
  * #SkeltrackSkeleton:shoulders-arc-length ,
  * #SkeltrackSkeleton:shoulders-circumference-radius ,
- * #SkeltrackSkeleton:shoulders-search-step .
+ * #SkeltrackSkeleton:shoulders-search-step ,
+ * #SkeltrackSkeleton:intrinsics-scale-factor ,
+ * #SkeltrackSkeleton:intrinsics-min-distance .
  **/
 #include <string.h>
 #include <math.h>
@@ -83,6 +85,8 @@
 #define DEFAULT_FOCUS_POINT_Z 1000
 #define TORSO_MINIMUM_NUMBER_NODES_DEFAULT 16.0
 #define EXTREMA_SPHERE_RADIUS 300
+#define INTRINSICS_SCALE_FACTOR 0.0021
+#define INTRINSICS_MIN_DISTANCE -10
 
 /* private data */
 struct _SkeltrackSkeletonPrivate
@@ -113,6 +117,9 @@ struct _SkeltrackSkeletonPrivate
 
   guint16 extrema_sphere_radius;
 
+  gfloat intrinsics_scale_factor;
+  gfloat intrinsics_min_distance;
+
   Node *focus_node;
 
   gboolean enable_smoothing;
@@ -142,7 +149,9 @@ enum
     PROP_SMOOTHING_FACTOR,
     PROP_JOINTS_PERSISTENCY,
     PROP_ENABLE_SMOOTHING,
-    PROP_TORSO_MINIMUM_NUMBER_NODES
+    PROP_TORSO_MINIMUM_NUMBER_NODES,
+    PROP_INTRINSICS_SCALE_FACTOR,
+    PROP_INTRINSICS_MIN_DISTANCE
   };
 
 
@@ -432,7 +441,65 @@ skeltrack_skeleton_class_init (SkeltrackSkeletonClass *class)
                                             EXTREMA_SPHERE_RADIUS,
                                             G_PARAM_READWRITE |
                                             G_PARAM_STATIC_STRINGS));
+  /**
+   * SkeltrackSkeleton:intrinsics-scale-factor:
+   *
+   * The scale factor that is part of the camera intrinsics.
+   * This is the scale factor from the formulas:
+   *
+   * x=(i-width/2)*(Z-Zmin)*scale_factor
+   * y=(i-height/2)*(Z-Zmin)*scale_factor
+   *
+   * These formulas come from considering the perspective mapping and
+   * doing some trigonometry, see for example:
+   *
+   * http://pille.iwr.uni-heidelberg.de/~kinect01/doc/reconstruction.html
+   *
+   * By solving for scale_factor and Zmin you can obtain an expression
+   * for both in terms of x, i and z and by taking two measurements you
+   * can obtain the intrinsics for your camera.
+   *
+   **/
+  g_object_class_install_property (obj_class,
+                         PROP_INTRINSICS_SCALE_FACTOR,
+                         g_param_spec_float ("intrinsics-scale-factor",
+                    "Intrinsics scale factor",
+                    "The instrinsics scale factor for your particular camera",
+                    -(G_MAXFLOAT),
+                    G_MAXFLOAT,
+                    INTRINSICS_SCALE_FACTOR,
+                    G_PARAM_READWRITE |
+                    G_PARAM_STATIC_STRINGS));
 
+  /**
+   * SkeltrackSkeleton:intrinsics-min-distance:
+   *
+   * The minimum distance that is part of the camera intrinsics.
+   * This is the Zmin from the formulas:
+   *
+   * x=(i-width/2)*(Z-Zmin)*scale_factor
+   * y=(i-height/2)*(Z-Zmin)*scale_factor
+   *
+   * These formulas come from considering the perspective mapping and
+   * doing some trigonometry, see for example:
+   *
+   * http://pille.iwr.uni-heidelberg.de/~kinect01/doc/reconstruction.html
+   *
+   * By solving for scale_factor and Zmin you can obtain an expression
+   * for both in terms of x, i and z and by taking two measurements you
+   * can obtain the intrinsics for your camera.
+   *
+   **/
+  g_object_class_install_property (obj_class,
+                         PROP_INTRINSICS_MIN_DISTANCE,
+                         g_param_spec_float ("intrinsics-min-distance",
+                "Intrinsics min distance",
+                "The instrinsics minimum distance for your particular camera",
+                -(G_MAXFLOAT),
+                G_MAXFLOAT,
+                INTRINSICS_MIN_DISTANCE,
+                G_PARAM_READWRITE |
+                G_PARAM_STATIC_STRINGS));
 
   /* add private structure */
   g_type_class_add_private (obj_class, sizeof (SkeltrackSkeletonPrivate));
@@ -470,6 +537,9 @@ skeltrack_skeleton_init (SkeltrackSkeleton *self)
   priv->shoulders_search_step = SHOULDERS_SEARCH_STEP;
 
   priv->extrema_sphere_radius = EXTREMA_SPHERE_RADIUS;
+
+  priv->intrinsics_scale_factor = INTRINSICS_SCALE_FACTOR;
+  priv->intrinsics_min_distance = INTRINSICS_MIN_DISTANCE;
 
   priv->focus_node = g_slice_new0 (Node);
   priv->focus_node->x = 0;
@@ -585,6 +655,14 @@ skeltrack_skeleton_set_property (GObject      *obj,
       self->priv->torso_minimum_number_nodes = g_value_get_float (value);
       break;
 
+    case PROP_INTRINSICS_SCALE_FACTOR:
+      self->priv->intrinsics_scale_factor = g_value_get_float (value);
+      break;
+
+    case PROP_INTRINSICS_MIN_DISTANCE:
+      self->priv->intrinsics_min_distance = g_value_get_float (value);
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (obj, prop_id, pspec);
       break;
@@ -653,6 +731,14 @@ skeltrack_skeleton_get_property (GObject    *obj,
 
     case PROP_TORSO_MINIMUM_NUMBER_NODES:
       g_value_set_float (value, self->priv->torso_minimum_number_nodes);
+      break;
+
+    case PROP_INTRINSICS_SCALE_FACTOR:
+      g_value_set_float (value, self->priv->intrinsics_scale_factor);
+      break;
+
+    case PROP_INTRINSICS_MIN_DISTANCE:
+      g_value_set_float (value, self->priv->intrinsics_min_distance);
       break;
 
     default:
@@ -748,6 +834,8 @@ make_graph (SkeltrackSkeleton *self, GList **label_list)
           convert_screen_coords_to_mm (self->priv->buffer_width,
                                        self->priv->buffer_height,
                                        self->priv->dimension_reduction,
+                                       self->priv->intrinsics_scale_factor,
+                                       self->priv->intrinsics_min_distance,
                                        i, j,
                                        node->z,
                                        &(node->x),
@@ -1188,6 +1276,8 @@ get_shoulder_node (SkeltrackSkeletonPrivate *priv,
       convert_mm_to_screen_coords (priv->buffer_width,
                                    priv->buffer_height,
                                    priv->dimension_reduction,
+                                   priv->intrinsics_scale_factor,
+                                   priv->intrinsics_min_distance,
                                    current_x,
                                    current_y,
                                    z_centroid,
@@ -1557,6 +1647,8 @@ static Node *
 get_adjusted_shoulder (guint buffer_width,
                        guint buffer_height,
                        guint dimension_reduction,
+                       gfloat scale_factor,
+                       gfloat min_distance,
                        GList *graph,
                        Node *centroid,
                        Node *head,
@@ -1571,6 +1663,8 @@ get_adjusted_shoulder (guint buffer_width,
   convert_mm_to_screen_coords (buffer_width,
                                buffer_height,
                                dimension_reduction,
+                               scale_factor,
+                               min_distance,
                                virtual_shoulder->x,
                                virtual_shoulder->y,
                                virtual_shoulder->z,
@@ -1645,12 +1739,14 @@ track_joints (SkeltrackSkeleton *self)
         {
           Node *adjusted_shoulder;
           adjusted_shoulder = get_adjusted_shoulder (self->priv->buffer_width,
-                                                self->priv->buffer_height,
-                                                self->priv->dimension_reduction,
-                                                self->priv->graph,
-                                                centroid,
-                                                head,
-                                                left_shoulder);
+                                          self->priv->buffer_height,
+                                          self->priv->dimension_reduction,
+                                          self->priv->intrinsics_scale_factor,
+                                          self->priv->intrinsics_min_distance,
+                                          self->priv->graph,
+                                          centroid,
+                                          head,
+                                          left_shoulder);
 
           if (adjusted_shoulder)
             left_shoulder = adjusted_shoulder;
@@ -1665,12 +1761,14 @@ track_joints (SkeltrackSkeleton *self)
         {
           Node *adjusted_shoulder;
           adjusted_shoulder = get_adjusted_shoulder (self->priv->buffer_width,
-                                                self->priv->buffer_height,
-                                                self->priv->dimension_reduction,
-                                                self->priv->graph,
-                                                centroid,
-                                                head,
-                                                right_shoulder);
+                                          self->priv->buffer_height,
+                                          self->priv->dimension_reduction,
+                                          self->priv->intrinsics_scale_factor,
+                                          self->priv->intrinsics_min_distance,
+                                          self->priv->graph,
+                                          centroid,
+                                          head,
+                                          right_shoulder);
 
           if (adjusted_shoulder)
             right_shoulder = adjusted_shoulder;
