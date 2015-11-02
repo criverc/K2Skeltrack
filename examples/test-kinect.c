@@ -283,7 +283,7 @@ paint_joint (cairo_t *cairo,
   cairo_arc (cairo,
              joint->screen_x,
              joint->screen_y,
-             radius * (THRESHOLD_END - THRESHOLD_BEGIN) / joint->z,
+             radius / joint->z,
              0,
              G_PI * 2);
   cairo_fill (cairo);
@@ -352,7 +352,7 @@ on_skeleton_draw (ClutterCanvas *canvas,
   cairo_fill (cairo);
   clutter_color_free (color);
 
-  paint_joint (cairo, head, 50, "#FFF800");
+  paint_joint (cairo, head, 50000, "#FFF800");
 
   connect_joints (cairo, left_shoulder, right_shoulder, "#afafaf");
 
@@ -364,9 +364,9 @@ on_skeleton_draw (ClutterCanvas *canvas,
 
   connect_joints (cairo, left_hand, left_elbow, "#afafaf");
 
-  paint_joint (cairo, left_hand, 30, "#C2FF00");
+  paint_joint (cairo, left_hand, 30000, "#C2FF00");
 
-  paint_joint (cairo, right_hand, 30, "#00FAFF");
+  paint_joint (cairo, right_hand, 30000, "#00FAFF");
 
   skeltrack_joint_list_free (list);
   list = NULL;
