@@ -30,7 +30,7 @@ static gfloat SMOOTHING_FACTOR = .5;
 static guint THRESHOLD_BEGIN = 500;
 /* Adjust this value to increase of decrease
    the threshold */
-static guint THRESHOLD_END   = 1500;
+static guint THRESHOLD_END   = 3000;
 static gint DIMENSION_REDUCTION = 8;
 
 void* kinect = NULL;
