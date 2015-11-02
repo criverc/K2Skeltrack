@@ -591,6 +591,10 @@ main (int argc, char *argv[])
   skeleton = skeltrack_skeleton_new ();
   g_object_get (skeleton, "smoothing-factor", &SMOOTHING_FACTOR, NULL);
 
+  g_object_set (skeleton, "hands-minimum-distance", 300,
+                          "shoulder-circumference-radius", 200,
+                          NULL);
+
   set_info_text ();
 
   g_signal_connect (depth_canvas,
