@@ -495,8 +495,6 @@ on_destroy (ClutterActor *actor, gpointer data)
   ClutterContent *content;
   GFreenectDevice *device = GFREENECT_DEVICE (data);
 
-  GFreenectDevice *device = GFREENECT_DEVICE (data);
-
   gfreenect_device_stop_depth_stream (device, NULL);
   gfreenect_device_stop_video_stream (device, NULL);
   clutter_main_quit ();
