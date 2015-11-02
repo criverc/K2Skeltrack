@@ -25,9 +25,6 @@
 #include "skeltrack-util.h"
 #include "pqueue.h"
 
-/* @TODO: Expose these to the user */
-static const gfloat SCALE_FACTOR = .0021;
-static const gint MIN_DISTANCE = -10.0;
 
 static SkeltrackJoint *
 node_to_joint (Node *node, SkeltrackJointId id, gint dimension_reduction)
@@ -585,6 +582,8 @@ void
 convert_screen_coords_to_mm (guint width,
                              guint height,
                              guint dimension_reduction,
+                             gfloat scale_factor,
+                             gfloat min_distance,
                              guint i,
                              guint j,
                              gint  z,
@@ -595,15 +594,17 @@ convert_screen_coords_to_mm (guint width,
     width > height ? (gfloat) width / height : (gfloat) height / width;
   /* Formula from http://openkinect.org/wiki/Imaging_Information */
   *x = round((i * dimension_reduction - width * dimension_reduction / 2.0) *
-             (z + MIN_DISTANCE) * SCALE_FACTOR * width_height_relation);
+             (z + min_distance) * scale_factor * width_height_relation);
   *y = round((j * dimension_reduction - height * dimension_reduction / 2.0) *
-             (z + MIN_DISTANCE) * SCALE_FACTOR);
+             (z + min_distance) * scale_factor);
 }
 
 void
 convert_mm_to_screen_coords (guint  width,
                              guint  height,
                              guint  dimension_reduction,
+                             gfloat scale_factor,
+                             gfloat min_distance,
                              gint   x,
                              gint   y,
                              gint   z,
@@ -613,15 +614,15 @@ convert_mm_to_screen_coords (guint  width,
   gfloat width_height_relation =
     width > height ? (gfloat) width / height : (gfloat) height / width;
 
-  if (z + MIN_DISTANCE == 0)
+  if (z + min_distance == 0)
     {
       *i = 0;
       *j = 0;
       return;
     }
 
-  *i = round (width / 2.0 + x / ((gfloat) (z + MIN_DISTANCE) * SCALE_FACTOR *
+  *i = round (width / 2.0 + x / ((gfloat) (z + min_distance) * scale_factor *
                                  dimension_reduction * width_height_relation));
-  *j = round (height / 2.0 + y / ((gfloat) (z + MIN_DISTANCE) * SCALE_FACTOR *
+  *j = round (height / 2.0 + y / ((gfloat) (z + min_distance) * scale_factor *
                                   dimension_reduction));
 }
