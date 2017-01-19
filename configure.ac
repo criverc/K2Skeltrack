@@ -155,6 +155,7 @@ AC_OUTPUT([
         doc/Makefile
         doc/reference/Makefile
         examples/Makefile
+	k2_examples/Makefile
         tests/Makefile
 ])
 

@@ -13,6 +13,10 @@ if ENABLE_EXAMPLES
 SUBDIRS += examples
 endif
 
+if ENABLE_EXAMPLES_FREENECT2
+SUBDIRS += k2_examples
+endif
+
 DIST_SUBDIRS = \
 	skeltrack
 
